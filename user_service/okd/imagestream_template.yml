@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: sbe-User-svc-imagestream-template
+  annotations:
+    openshift.io/display-name: SBE_USER SVC IMAGE STREAM
+    description: SBE_USER SVC IMAGE STREAM
+    iconClass: "icon-java"
+    tags: "java"
+    template.openshift.io/bindable: "false"
+parameters:
+  - name: PROJECT_NAME
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Project Name
+    required: true
+    value: rdso
+  - name: APP_NAME
+    description: The name assigned to all of the application objects defined in this template.
+    displayName: Application Name
+    required: true
+    value: user-service
+  - name: BUILD_TYPE
+    description: The application environment.
+    displayName: Application Environment
+    required: true
+    value: development
+objects:
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      name: ${APP_NAME}-${BUILD_TYPE}
+      annotations:
+        openshift.io/display-name: SBE_USER SVC IMAGE STREAM
+    spec:
+      tags:
+        - name: build
+          annotations:
+            openshift.io/display-name: SBE_USER SVC ${BUILD_TYPE} build
+            description: >-
+              Application Build
+            iconClass: icon-java
+            tags: builder,${APP_NAME},java,${BUILD_TYPE},build
+            supports: java
+            version: build
+          from:
+            kind: DockerImage
+            name: ${APP_NAME}-${BUILD_TYPE}:build
+        - name: image
+          annotations:
+            openshift.io/display-name: SBE_USER SVC ${BUILD_TYPE} image
+            description: >-
+              Application Docker Image
+            iconClass: icon-java
+            tags: builder,${APP_NAME},java,${BUILD_TYPE},image
+            supports: java
+            version: image
+          from:
+            kind: DockerImage
+            name: ${APP_NAME}-${BUILD_TYPE}:image
+labels:
+  name: ${APP_NAME}-imagestream

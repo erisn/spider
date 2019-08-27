@@ -1,0 +1,17 @@
+################
+# BUILD STAGE
+################
+
+FROM maven:3.6
+
+WORKDIR /app
+
+COPY Backend/user_service/pom.xml .
+COPY Backend/user_service/config config
+COPY Backend/user_service/src src
+COPY Backend/user_service/mvnw .
+COPY Backend/user_service/mvnw.cmd .
+
+RUN mvn -B -Dmaven.test.failure.ignore=true -DskipTests=true clean package
+
+ENTRYPOINT ["/usr/bin/mvn"]

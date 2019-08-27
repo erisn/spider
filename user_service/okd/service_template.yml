@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: user-service-service-template
+  annotations:
+    openshift.io/display-name: USER SERVICE SERVICE TEMPLATE
+    description: USER SERVICE Service
+    iconClass: "icon-java"
+    tags: "java"
+    template.openshift.io/bindable: "false"
+parameters:
+  - name: PROJECT_NAME
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Project Name
+    required: true
+    value: rdso
+  - name: NAMESPACE
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Namespace
+    required: true
+    value: rdso-nonprod
+  - name: APP_NAME
+    description: The name assigned to all of the application objects defined in this template.
+    displayName: Application Name
+    required: true
+    value: user-service
+  - name: ENVIRONMENT
+    description: The application environment.
+    displayName: Application Environment
+    required: true
+    value: nonprod
+  - name: DNS_ZONE_NAME
+    description: The base domain zone
+    displayName: DNS Zone Name
+    required: true
+objects:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: ${APP_NAME}
+        environment: ${ENVIRONMENT}
+      name: ${ENVIRONMENT}-${APP_NAME}
+      namespace: ${NAMESPACE}
+    spec:
+      ports:
+        - name: web
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+      selector:
+        name: ${ENVIRONMENT}-${APP_NAME}
+      sessionAffinity: None
+      type: ClusterIP
+  - kind: Route
+    apiVersion: route.openshift.io/v1
+    metadata:
+      annotations:
+        haproxy.router.openshift.io/timeout: 4m
+        openshift.io/host.generated: 'true'
+        template.openshift.io/expose-uri: 'http://{.spec.host}{.spec.path}'
+      labels:
+        app: ${APP_NAME}
+        environment: ${ENVIRONMENT}
+      name: ${ENVIRONMENT}-${APP_NAME}
+      namespace: ${NAMESPACE}
+    spec:
+      host: ${ENVIRONMENT}-${APP_NAME}.${PROJECT_NAME}.okd.${DNS_ZONE_NAME}
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      to:
+        kind: Service
+        name: ${ENVIRONMENT}-${APP_NAME}
+        weight: 100
+      wildcardPolicy: None
+labels:
+  name: ${APP_NAME}-service

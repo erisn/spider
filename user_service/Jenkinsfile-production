@@ -1,0 +1,37 @@
+node {
+  properties([
+    disableConcurrentBuilds(),
+    pipelineTriggers([pollSCM('* * * * *')])
+  ])
+
+  if (env.BUILD_NUMBER == "1"){
+    print 'Only populating job parameters on initial run. Exiting!'
+    currentBuild.result = 'SUCCESS'
+    return
+  }
+
+  stage('Checkout') {
+    deleteDir()
+    checkout scm
+  }
+
+  stage('Service Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/service_template.yml -p ENVIRONMENT=production -p NAMESPACE=rdso-production | oc create -f - \
+       || oc process -f Backend/user_service/okd/service_template.yml -p ENVIRONMENT=production -p NAMESPACE=rdso-production | oc replace -f - || true'''
+  }
+
+  stage('Deployment Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/deployconfig_template.yml -p BUILD_TYPE=qa \
+       -p ENVIRONMENT=production -p NAMESPACE=rdso-production | oc create -f - || \
+       oc process -f Backend/user_service/okd/deployconfig_template.yml -p BUILD_TYPE=qa \
+       -p ENVIRONMENT=production -p NAMESPACE=rdso-production | oc replace -f - || true'''
+  }
+
+  stage('Deploy') {
+    openshiftDeploy(deploymentConfig: 'production-user-service-deployment')
+  }
+}

@@ -1,0 +1,108 @@
+{
+	"info": {
+		"_postman_id": "da5f1f3c-bfbc-4939-8b99-752e8e737b6a",
+		"name": "UserService_Newman",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "UserService_HealthCheck",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "b27e61bf-6879-4e14-920a-8cdb58c81b54",
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://nonprod-user-service.rdso.okd.acuityinc.us/swagger-ui.html#!/user45controller/healthCheckUsingGET",
+					"protocol": "https",
+					"host": [
+						"nonprod-user-service",
+						"rdso",
+						"okd",
+						"acuityinc",
+						"us"
+					],
+					"path": [
+						"swagger-ui.html"
+					],
+					"hash": "!/user45controller/healthCheckUsingGET"
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UserService_LoginCheck",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "b27e61bf-6879-4e14-920a-8cdb58c81b54",
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"password\": \"abc\",\r\n  \"username\": \"abc\"\r\n}"
+				},
+				"url": {
+					"raw": "https://nonprod-user-service.rdso.okd.acuityinc.us/swagger-ui.html#!/token45controller/postAccessTokenUsingPOST?username=abc&password=abc",
+					"protocol": "https",
+					"host": [
+						"nonprod-user-service",
+						"rdso",
+						"okd",
+						"acuityinc",
+						"us"
+					],
+					"path": [
+						"swagger-ui.html"
+					],
+					"query": [
+						{
+							"key": "username",
+							"value": "abc"
+						},
+						{
+							"key": "password",
+							"value": "abc"
+						}
+					],
+					"hash": "!/token45controller/postAccessTokenUsingPOST?username=abc&password=abc"
+				}
+			},
+			"response": []
+		}
+	]
+}

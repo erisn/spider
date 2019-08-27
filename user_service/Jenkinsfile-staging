@@ -1,0 +1,49 @@
+node {
+  properties([
+    disableConcurrentBuilds(),
+    pipelineTriggers([pollSCM('* * * * *')])
+  ])
+
+  if (env.BUILD_NUMBER == "1"){
+    print 'Only populating job parameters on initial run. Exiting!'
+    currentBuild.result = 'SUCCESS'
+    return
+  }
+
+  stage('Checkout') {
+    deleteDir()
+    checkout scm
+  }
+
+  stage('Build') {
+    openshiftBuild(buildConfig: 'user-service-staging-build', showBuildLogs: 'true', waitTime: '1200', waitUnit: 'sec')
+  }
+
+  stage('Test') {
+    openshiftBuild(buildConfig: 'user-service-staging-regression-test', showBuildLogs: 'true', waitTime: '1200', waitUnit: 'sec')
+  }
+
+  stage('Package') {
+    openshiftBuild(buildConfig: 'user-service-staging-image', showBuildLogs: 'true')
+  }
+
+  stage('Service Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/service_template.yml -p ENVIRONMENT=staging -p NAMESPACE=rdso-staging | oc create -f - \
+       || oc process -f Backend/user_service/okd/service_template.yml -p ENVIRONMENT=staging -p NAMESPACE=rdso-staging | oc replace -f - || true'''
+  }
+
+  stage('Deployment Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/deployconfig_template.yml -p BUILD_TYPE=staging \
+       -p ENVIRONMENT=staging -p NAMESPACE=rdso-staging -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc create -f - || \
+       oc process -f Backend/user_service/okd/deployconfig_template.yml -p BUILD_TYPE=staging \
+       -p ENVIRONMENT=staging -p NAMESPACE=rdso-staging -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc replace -f - || true'''
+  }
+
+  stage('Deploy') {
+    openshiftDeploy(deploymentConfig: 'staging-user-service-deployment')
+  }
+}

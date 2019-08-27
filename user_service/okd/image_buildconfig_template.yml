@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: sbe-User-svc-docker-build-template
+  annotations:
+    openshift.io/display-name: SBE_USER SVC DOCKER IMAGE BUILD
+    description: SBE_USER SVC DOCKER IMAGE BUILD
+    iconClass: "icon-java"
+    tags: "java"
+    template.openshift.io/bindable: "false"
+parameters:
+  - name: PROJECT_NAME
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Project Name
+    required: true
+    value: rdso
+  - name: NAMESPACE
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Namespace
+    required: true
+    value: rdso-nonprod
+  - name: APP_NAME
+    description: The name assigned to all of the application objects defined in this template.
+    displayName: Application Name
+    required: true
+    value: user-service
+  - name: SOURCE_REPOSITORY_URL
+    displayName: Source Repository URL
+    description: The URL of the repository with your application source code
+    value: git@github.com:Acuity-Inc/spider-root.git
+    required: true
+  - name: SOURCE_REPOSITORY_SECRET_KEY
+    description: Number of replicas to run
+    value: gitsshkey
+    required: true
+  - name: SOURCE_REPOSITORY_REF
+    description: Github branch to deploy
+    value: develop
+  - name: BUILD_TYPE
+    description: The application environment.
+    displayName: Application Environment
+    required: true
+    value: development
+objects:
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      name: ${APP_NAME}-${BUILD_TYPE}-image
+      namespace: ${NAMESPACE}
+      labels:
+        name: ${APP_NAME}-${BUILD_TYPE}-image
+    spec:
+      successfulBuildsHistoryLimit: 3
+      failedBuildsHistoryLimit: 3
+      source:
+        git:
+          uri: ${SOURCE_REPOSITORY_URL}
+          ref: ${SOURCE_REPOSITORY_REF}
+        sourceSecret:
+          name: ${SOURCE_REPOSITORY_SECRET_KEY}
+        images:
+          - from:
+              kind: ImageStreamTag
+              name: ${APP_NAME}-${BUILD_TYPE}:build
+              namespace: ${NAMESPACE}
+            paths:
+              - destinationDir: '.'
+                sourcePath: /app/target
+      strategy:
+        type: Docker
+        dockerStrategy:
+          dockerfilePath: Backend/user_service/docker/DockerfileDeploy
+          forcePull: true
+          noCache: true
+      output:
+        to:
+          kind: ImageStreamTag
+          name: ${APP_NAME}-${BUILD_TYPE}:image
+        imageLabels:
+          - name: project
+            value: ${PROJECT_NAME}
+          - name: service
+            value: ${APP_NAME}
+          - name: stage
+            value: image-build
+          - name: build-type
+            value: ${BUILD_TYPE}
+labels:
+  name: ${APP_NAME}-docker-image-build

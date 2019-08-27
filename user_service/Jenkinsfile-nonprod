@@ -1,0 +1,55 @@
+node {
+  properties([
+    disableConcurrentBuilds(),
+    pipelineTriggers([pollSCM('* * * * *')])
+  ])
+
+  if (env.BUILD_NUMBER == "1"){
+    print 'Only populating job parameters on initial run. Exiting!'
+    currentBuild.result = 'SUCCESS'
+    return
+  }
+
+  stage('Checkout') {
+    deleteDir()
+    checkout scm
+  }
+
+  dir('Backend/user_service') {
+    stage('Build') {
+      openshiftBuild(buildConfig: 'user-service-development-build', showBuildLogs: 'true', waitTime: '1200', waitUnit: 'sec')
+    }
+
+    // stage('Unit Test') {
+    //   openshiftBuild(buildConfig: 'user-service-development-unit-test', showBuildLogs: 'true', waitTime: '1200', waitUnit: 'sec')
+    // }
+
+    // stage('Code Analysis') {
+    //   openshiftBuild(buildConfig: 'user-service-development-code-analysis', showBuildLogs: 'true', waitTime: '1200', waitUnit: 'sec')
+    // }
+
+    stage('Package') {
+      openshiftBuild(buildConfig: 'user-service-development-image', showBuildLogs: 'true')
+    }
+
+    stage('Service Template') {
+      sh returnStdout: false, script:"""
+        /bin/bash --login
+        oc process -f okd/service_template.yml -p ENVIRONMENT=nonprod -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc create -f - \
+         || oc process -f okd/service_template.yml -p ENVIRONMENT=nonprod -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc replace -f - || true"""
+    }
+
+    stage('Deployment Template') {
+      sh returnStdout: false, script:'''
+        /bin/bash --login
+        oc process -f okd/deployconfig_template.yml -p BUILD_TYPE=development \
+         -p ENVIRONMENT=nonprod -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc create -f - || \
+         oc process -f okd/deployconfig_template.yml -p BUILD_TYPE=development \
+         -p ENVIRONMENT=nonprod -p DNS_ZONE_NAME=${env.DNS_ZONE_NAME} | oc replace -f - || true'''
+    }
+
+    stage('Deploy') {
+      openshiftDeploy(deploymentConfig: 'nonprod-user-service-deployment')
+    }
+  }
+}

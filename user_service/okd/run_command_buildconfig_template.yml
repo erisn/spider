@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: user-service-application-docker-command-template
+  annotations:
+    openshift.io/display-name: USER SERVICE APPLICATION DOCKER COMMAND
+    description: USER SERVICE APPLICATION DOCKER COMMAND
+    iconClass: "icon-java"
+    tags: "java"
+    template.openshift.io/bindable: "false"
+parameters:
+  - name: NAMESPACE
+    description: The namespace assigned to all of the application objects defined in this template.
+    displayName: Namespace
+    required: true
+    value: rdso-nonprod
+  - name: APP_NAME
+    description: The name assigned to all of the application objects defined in this template.
+    displayName: Application Name
+    required: true
+    value: user-service
+  - name: BUILD_TYPE
+    description: The application environment.
+    displayName: Application Environment
+    required: true
+    value: development
+  - name: COMMAND_TO_RUN
+    description: Command to Run
+    displayName: Command to Run
+    required: true
+    value: echo build complete
+  - name: PIPELINE_STAGE
+    description: Pipeline Stage
+    displayName: Pipeline Stage
+    required: true
+    value: validate
+objects:
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      name: ${APP_NAME}-${BUILD_TYPE}-${PIPELINE_STAGE}
+      namespace: ${NAMESPACE}
+      labels:
+        name: ${APP_NAME}-${BUILD_TYPE}-${PIPELINE_STAGE}
+    spec:
+      successfulBuildsHistoryLimit: 2
+      failedBuildsHistoryLimit: 2
+      source:
+        dockerfile: "FROM docker-registry.default.svc:5000/${NAMESPACE}/${APP_NAME}-${BUILD_TYPE}:build"
+      strategy:
+        type: Docker
+        dockerStrategy:
+          forcePull: true
+          noCache: true
+          env:
+            - name: SONARQUBE_SERVER
+              value: http://sonar.demo.acuityinc.us/sonar
+      postCommit:
+        command:
+          - /bin/bash
+          - -c
+          - ${COMMAND_TO_RUN}
+labels:
+  name: ${APP_NAME}-application-${PIPELINE_STAGE}

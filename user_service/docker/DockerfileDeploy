@@ -1,0 +1,35 @@
+################
+# PACKAGE STAGE
+################
+FROM openjdk:8-jre-alpine
+
+USER root
+
+# Install Dependencies
+RUN apk add --update bash ruby ruby-doc ruby-json ruby-webrick curl \
+  && rm -rf /var/cache/apk/*
+
+# Set application directory
+ARG APP_DIR=/app
+WORKDIR ${APP_DIR}
+
+# Copy JAR and entrypoint script
+COPY target/*.jar ROOT.jar
+COPY Backend/user_service/docker/docker-entrypoint.sh .
+
+# Update permissions
+RUN chmod 755 ROOT.jar docker-entrypoint.sh \
+  && chown nobody ROOT.jar docker-entrypoint.sh
+
+# Install Gems
+# RUN gem install crossing -v 0.1.6 --no-document \
+#   && gem install erubis --no-document
+
+RUN chown -R nobody /app
+
+# Set user
+USER nobody
+EXPOSE 8080
+
+# Default entrypoint command
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

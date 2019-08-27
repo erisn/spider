@@ -1,0 +1,140 @@
+node {
+  stage('Commit') {
+    deleteDir()
+    checkout scm
+  }
+
+  withCredentials([string(credentialsId: 'okd-pass', variable: 'OKD_PASSWORD')]) {
+    stage('OKD Login') {
+      sh "oc login -u jenkins -p ${OKD_PASSWORD} -s https://master.rdso.okd.${env.DNS_ZONE_NAME}:8443 --insecure-skip-tls-verify"
+      sh 'oc project rdso-nonprod'
+    }
+  }
+
+  //////////////////////////////////
+  ///// DEV TEMPLATES //////////////
+  //////////////////////////////////
+
+  // CREATE APPLICATION IMAGESTREAM
+  stage('Development ImageStream Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/imagestream_template.yml | oc create -f - \
+       || oc process -f Backend/user_service/okd/imagestream_template.yml | oc replace -f -'''
+  }
+
+  // CREATE Build Config to Build Application JAR File in Dev Branch
+  stage('Development App BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/app_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=develop \
+       -p BUILD_TYPE=development | oc create -f - || \
+       oc process -f Backend/user_service/okd/app_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=develop \
+       -p BUILD_TYPE=development | oc replace -f -'''
+  }
+
+  // CREATE Build Config to Build Application Docker Image in Dev Branch
+  stage('Development Image BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/image_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=develop \
+       -p BUILD_TYPE=development | oc create -f - || \
+       oc process -f Backend/user_service/okd/image_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=develop \
+       -p BUILD_TYPE=development | oc replace -f -'''
+  }
+
+  stage('Development Unit Test BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=development -p PIPELINE_STAGE=unit-test \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test' | oc create -f - || \
+       oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=development -p PIPELINE_STAGE=unit-test \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test' | oc replace -f -'''
+  }
+
+  stage('Development Code Analysis BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=development -p PIPELINE_STAGE=code-analysis \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test && /usr/bin/mvn jacoco:report && /usr/bin/mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar' | oc create -f - || \
+       oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=development -p PIPELINE_STAGE=code-analysis \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test && /usr/bin/mvn jacoco:report && /usr/bin/mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar' | oc replace -f -'''
+  }
+
+  // CREATE Dev Branch Build, Test and Deploy Pipeline
+  stage('Nonprod Pipeline Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=nonprod \
+       -p SOURCE_REPOSITORY_REF=develop | oc create -f - || \
+       oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=nonprod \
+       -p SOURCE_REPOSITORY_REF=develop | oc replace -f -'''
+  }
+
+  //////////////////////////////////
+  ///// STAGING TEMPLATES //////////
+  //////////////////////////////////
+
+  // CREATE APPLICATION IMAGESTREAM
+   stage('Staging ImageStream Template') {
+    sh 'oc project rdso-staging'
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/imagestream_template.yml -p BUILD_TYPE=staging | oc create -f - \
+       || oc process -f Backend/user_service/okd/imagestream_template.yml -p BUILD_TYPE=staging | oc replace -f -'''
+  }
+
+  // CREATE Build Config to Build Application JAR File in Dev Branch
+  stage('Staging App BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/app_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=staging \
+       -p BUILD_TYPE=staging -p NAMESPACE=rdso-staging | oc create -f - || \
+       oc process -f Backend/user_service/okd/app_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=staging \
+       -p BUILD_TYPE=staging -p NAMESPACE=rdso-staging | oc replace -f -'''
+  }
+
+  // CREATE Build Config to Build Application Docker Image in Dev Branch
+  stage('Staging Image BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/image_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=staging \
+       -p BUILD_TYPE=staging -p NAMESPACE=rdso-staging | oc create -f - || \
+       oc process -f Backend/user_service/okd/image_buildconfig_template.yml -p SOURCE_REPOSITORY_REF=staging \
+       -p BUILD_TYPE=staging -p NAMESPACE=rdso-staging | oc replace -f -'''
+  }
+
+  // CREATE Build Config to SonarQube Analysis Against Compiled Application in Dev
+  stage('Staging Test BuildConfig Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=staging -p PIPELINE_STAGE=regression-test \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test' -p NAMESPACE=rdso-staging | oc create -f - || \
+       oc process -f Backend/user_service/okd/run_command_buildconfig_template.yml -p BUILD_TYPE=staging -p PIPELINE_STAGE=regression-test \
+       -p COMMAND_TO_RUN='/usr/bin/mvn test' -p NAMESPACE=rdso-staging | oc replace -f -'''
+  }
+
+  // CREATE Dev Branch Build, Test and Deploy Pipeline
+  stage('Staging Pipeline Template') {
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=staging \
+       -p SOURCE_REPOSITORY_REF=staging | oc create -f - || \
+       oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=staging \
+       -p SOURCE_REPOSITORY_REF=staging | oc replace -f -'''
+  }
+
+  //////////////////////////////////
+  ///// PRODUCTION TEMPLATES ///////
+  //////////////////////////////////
+
+  stage('Production Pipeline Template') {
+    sh 'oc project rdso-production'
+    sh returnStdout: false, script:'''
+      /bin/bash --login
+      oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=production \
+       -p SOURCE_REPOSITORY_REF=master | oc create -f - || \
+       oc process -f Backend/user_service/okd/pipeline_buildconfig_template.yml -p ENVIRONMENT=production \
+       -p SOURCE_REPOSITORY_REF=master | oc replace -f -'''
+  }
+}
